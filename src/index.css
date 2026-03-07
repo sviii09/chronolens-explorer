@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ChronoLens Design System - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    /* Core brand colors - Teal primary */
+    --primary: 168 76% 42%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Soft green accent */
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted saffron for highlights */
+    --highlight: 38 92% 50%;
+    --highlight-foreground: 0 0% 100%;
+    
+    /* Neutral grays */
+    --background: 210 20% 98%;
+    --foreground: 220 9% 43%;
+    --foreground-strong: 220 13% 26%;
+    
+    /* Card and surface */
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 26%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 26%;
+    
+    /* Secondary and muted */
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 13% 26%;
+    
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 9% 43%;
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders and inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 168 76% 42%;
+    
+    --radius: 0.5rem;
+    
+    /* Sidebar - Light gray */
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 220 9% 43%;
+    --sidebar-primary: 168 76% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 94%;
+    --sidebar-accent-foreground: 220 13% 26%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 168 76% 42%;
+    
+    /* Policy category colors */
+    --category-womens: 271 75% 69%;
+    --category-education: 213 94% 68%;
+    --category-healthcare: 0 91% 71%;
+    --category-transport: 27 96% 61%;
+    --category-taxation: 160 64% 52%;
+    
+    /* Chart colors */
+    --chart-1: 168 76% 42%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 213 94% 68%;
+    --chart-5: 271 75% 69%;
+    
+    /* Synthesis/AI summary background */
+    --synthesis: 48 96% 89%;
+    --synthesis-foreground: 38 92% 30%;
+  }
+
+  .dark {
+    --primary: 168 76% 42%;
+    --primary-foreground: 0 0% 100%;
+    
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 100%;
+    
+    --highlight: 38 92% 50%;
+    --highlight-foreground: 0 0% 100%;
+    
+    --background: 220 13% 10%;
+    --foreground: 220 9% 70%;
+    --foreground-strong: 220 9% 90%;
+    
+    --card: 220 13% 13%;
+    --card-foreground: 220 9% 90%;
+    
+    --popover: 220 13% 13%;
+    --popover-foreground: 220 9% 90%;
+    
+    --secondary: 220 13% 17%;
+    --secondary-foreground: 220 9% 90%;
+    
+    --muted: 220 13% 17%;
+    --muted-foreground: 220 9% 60%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 13% 20%;
+    --input: 220 13% 20%;
+    --ring: 168 76% 42%;
+    
+    --sidebar-background: 220 13% 10%;
+    --sidebar-foreground: 220 9% 70%;
+    --sidebar-primary: 168 76% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 17%;
+    --sidebar-accent-foreground: 220 9% 90%;
+    --sidebar-border: 220 13% 20%;
+    --sidebar-ring: 168 76% 42%;
+    
+    --synthesis: 38 50% 20%;
+    --synthesis-foreground: 38 92% 80%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-foreground-strong font-semibold;
+  }
+}
+
+@layer components {
+  /* Policy category badges */
+  .badge-womens {
+    @apply bg-category-womens text-white;
+  }
+  .badge-education {
+    @apply bg-category-education text-white;
+  }
+  .badge-healthcare {
+    @apply bg-category-healthcare text-white;
+  }
+  .badge-transport {
+    @apply bg-category-transport text-white;
+  }
+  .badge-taxation {
+    @apply bg-category-taxation text-white;
+  }
+}
+
+@layer utilities {
+  .text-foreground-strong {
+    color: hsl(var(--foreground-strong));
+  }
+  
+  .bg-synthesis {
+    background-color: hsl(var(--synthesis));
+  }
+  
+  .text-synthesis-foreground {
+    color: hsl(var(--synthesis-foreground));
+  }
+  
+  .bg-category-womens {
+    background-color: hsl(var(--category-womens));
+  }
+  .bg-category-education {
+    background-color: hsl(var(--category-education));
+  }
+  .bg-category-healthcare {
+    background-color: hsl(var(--category-healthcare));
+  }
+  .bg-category-transport {
+    background-color: hsl(var(--category-transport));
+  }
+  .bg-category-taxation {
+    background-color: hsl(var(--category-taxation));
+  }
+}
