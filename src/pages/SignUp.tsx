@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
+import { SocialLogin } from '@/components/SocialLogin';
+
+const PASSWORD_REQUIREMENTS = [
+  { id: 'length', label: 'At least 8 characters', test: (pwd: string) => pwd.length >= 8 },
+  { id: 'uppercase', label: 'One uppercase letter', test: (pwd: string) => /[A-Z]/.test(pwd) },
+  { id: 'lowercase', label: 'One lowercase letter', test: (pwd: string) => /[a-z]/.test(pwd) },
+  { id: 'number', label: 'One number', test: (pwd: string) => /[0-9]/.test(pwd) },
+  { id: 'special', label: 'One special character', test: (pwd: string) => /[!@#$%^&*]/.test(pwd) },
+];
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -15,8 +24,27 @@ export default function SignUp() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
+  const [passwordRequirements, setPasswordRequirements] = useState<Record<string, boolean>>({});
   const { signup, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Check password requirements
+  useEffect(() => {
+    const requirements: Record<string, boolean> = {};
+    PASSWORD_REQUIREMENTS.forEach((req) => {
+      requirements[req.id] = req.test(formData.password);
+    });
+    setPasswordRequirements(requirements);
+  }, [formData.password]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -25,10 +53,28 @@ export default function SignUp() {
     });
   };
 
+  const handleBlur = (field: keyof typeof touched) => {
+    setTouched({
+      ...touched,
+      [field]: true,
+    });
+  };
+
+  const isEmailValid = formData.email.includes('@') && formData.email.includes('.');
+  const isPasswordStrong = Object.values(passwordRequirements).every(Boolean);
+  const passwordsMatch = formData.password === formData.confirmPassword && formData.password.length > 0;
+  const isNameValid = formData.name.trim().length >= 2;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess(false);
+    setTouched({
+      name: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    });
 
     const { name, email, password, confirmPassword } = formData;
 
@@ -37,18 +83,28 @@ export default function SignUp() {
       return;
     }
 
-    if (!email.includes('@')) {
-      setError('Please enter a valid email');
+    if (!isNameValid) {
+      setError('Name must be at least 2 characters');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!isEmailValid) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (!isPasswordStrong) {
+      setError('Password does not meet all requirements');
       return;
     }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setError('You must agree to the Terms & Conditions');
       return;
     }
 
@@ -59,6 +115,16 @@ export default function SignUp() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
     }
+  };
+
+  const handleGoogleSignup = () => {
+    // In production, this would initiate Google OAuth flow
+    setError('Google sign-up: Fill in the form below to complete registration');
+  };
+
+  const handleOutlookSignup = () => {
+    // In production, this would initiate Outlook OAuth flow
+    setError('Outlook sign-up: Fill in the form below to complete registration');
   };
 
   if (success) {
@@ -96,6 +162,20 @@ export default function SignUp() {
 
         {/* Card */}
         <div className="bg-card border border-border rounded-lg shadow-lg p-8 mb-6">
+          {/* Social Login */}
+          <SocialLogin
+            isLoading={isLoading}
+            onGoogleClick={handleGoogleSignup}
+            onOutlookClick={handleOutlookSignup}
+          />
+
+          {/* Divider */}
+          <div className="my-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-border"></div>
+            <span className="text-xs text-muted-foreground">or create with email</span>
+            <div className="flex-1 h-px bg-border"></div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div>

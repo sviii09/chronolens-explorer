@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Settings } from 'lucide-react';
+import { Menu, X, LogOut, Settings, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { cn } from '@/lib/utils';
 
 export function AppHeader() {
   const { user, logout } = useAuth();
+  const { theme, setTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -50,8 +53,74 @@ export function AppHeader() {
           </Link>
         </nav>
 
-        {/* Auth Section */}
+        {/* Theme Toggle and Auth Section */}
         <div className="flex items-center gap-2">
+          {/* Theme Selector */}
+          <div className="relative hidden sm:block">
+            <button
+              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              title="Toggle theme"
+            >
+              {isDark ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+            </button>
+
+            {/* Theme Dropdown Menu */}
+            {themeMenuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-popover border border-border rounded-lg shadow-lg p-2">
+                <button
+                  onClick={() => {
+                    setTheme('light');
+                    setThemeMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors',
+                    theme === 'light'
+                      ? 'bg-primary/20 text-primary font-medium'
+                      : 'text-foreground hover:bg-secondary'
+                  )}
+                >
+                  <Sun className="h-4 w-4" />
+                  Light
+                </button>
+                <button
+                  onClick={() => {
+                    setTheme('dark');
+                    setThemeMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors',
+                    theme === 'dark'
+                      ? 'bg-primary/20 text-primary font-medium'
+                      : 'text-foreground hover:bg-secondary'
+                  )}
+                >
+                  <Moon className="h-4 w-4" />
+                  Dark
+                </button>
+                <button
+                  onClick={() => {
+                    setTheme('system');
+                    setThemeMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors',
+                    theme === 'system'
+                      ? 'bg-primary/20 text-primary font-medium'
+                      : 'text-foreground hover:bg-secondary'
+                  )}
+                >
+                  <Settings className="h-4 w-4" />
+                  System
+                </button>
+              </div>
+            )}
+          </div>
+
           {user ? (
             // User is logged in
             <div className="relative">

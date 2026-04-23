@@ -1,31 +1,30 @@
 # ChronoLens Backend Requirements
-# Install with: pip install -r requirements.txt
+# Installation: pip install -r requirements.txt
 
-# Web framework
-flask==3.1.0
+# Web Framework
+Flask==3.1.0
 flask-cors==5.0.0
 
-# RAG / NLP
+# Data Processing
+pandas>=1.5.0
+numpy>=1.24.0
+
+# RAG/NLP Pipeline
 langchain==0.3.25
 langchain-core==0.3.59
 langchain-community==0.3.23
 langchain-text-splitters==0.3.8
 
 # Embeddings
-sentence-transformers==3.4.1
+sentence-transformers>=3.0.0
 
-# Vector store
-faiss-cpu
+# Vector Database
+faiss-cpu>=1.8.0
 
-# LLM (local inference)
-transformers==4.51.3
-accelerate==1.6.0
-# Use a torch version compatible with Python 3.14
-torch==2.10.0
+# Large Language Model + Deep Learning
+torch>=2.0.0
+transformers>=4.40.0
+accelerate>=0.30.0
 
-# Data
-numpy
-pandas
-
-# Dataset download (Kaggle) — [pandas-datasets] extra enables KaggleDatasetAdapter.PANDAS
-kagglehub[pandas-datasets]==0.3.10
+# Optional: For GPU support, use instead of torch:
+# torch[cuda]>=2.0.0  # For NVIDIA GPUs

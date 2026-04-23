@@ -80,10 +80,23 @@ def _initialize():
         _embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
+        
+        # Verify embeddings are not returning all zeros
+        test_embedding = _embeddings.embed_query("test")
+        if all(x == 0.0 for x in test_embedding):
+            logger.critical("EMBEDDINGS BUG: HuggingFaceEmbeddings returned all-zero vector!")
+            logger.critical("This will cause RAG to return identical results for all queries.")
+            raise RuntimeError("Embeddings returning all zeros - corrupted model or environment issue")
+            
     except Exception as exc:
         logger.exception(
             "Failed to load HuggingFace embeddings, falling back to dummy. %s",
             str(exc),
+        )
+        logger.critical(
+            "⚠️  CRITICAL: Using DummyEmbeddings (all-zero vectors)!"
+            "\n⚠️  RAG will return IDENTICAL RESULTS for ALL QUERIES."
+            "\n⚠️  Fix: pip install sentence-transformers torch"
         )
 
         # Fallback: a minimal Embeddings-like object implementing the
@@ -93,7 +106,8 @@ def _initialize():
         # dependencies here so failure to load the real model doesn't crash
         # the service.
         class DummyEmbeddings:
-            """Dummy embeddings returning zero vectors for any input."""
+            """Dummy embeddings returning zero vectors for any input.
+            WARNING: This causes RAG to return identical results for all queries!"""
 
             def __init__(self, dim: int = 384):
                 self.dim = dim
@@ -174,19 +188,15 @@ def _initialize():
 
 def _build_and_save_vectorstore(save_path: str):
     """Load the dataset, chunk it, embed it, and persist FAISS.
-
-    The function now prefers a local CSV file named ``updated_data.csv`` located
-    in the same directory as this module.  If that file is missing it will fall
-    back to downloading the original Kaggle dataset (requires credentials).
-    If neither source is available it will raise an exception which is handled
-    by the caller to use a mock vectorstore.
+    
+    This follows the working approach from rag.py notebook.
     """
     import pandas as pd
     from langchain_core.documents import Document
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS
 
-    # allow override via environment variable for portability
+    # Load CSV
     env_path = os.environ.get("CHRONOLENS_DATA_CSV")
     if env_path:
         local_csv = env_path
@@ -198,44 +208,41 @@ def _build_and_save_vectorstore(save_path: str):
         df = pd.read_csv(local_csv)
         df = df.drop(columns=[c for c in df.columns if "Unnamed" in c], errors="ignore")
         
-        # For faster initialization in test/dev mode, support limiting documents
+        # For faster initialization in test/dev mode
         max_rows = os.environ.get("CHRONOLENS_MAX_ROWS")
         if max_rows:
             max_rows = int(max_rows)
             df = df.head(max_rows)
             logger.info("Limited to %d rows (fast mode)", max_rows)
         
-        logger.info("Local dataset loaded: %d rows, columns: %s", len(df), list(df.columns))
+        logger.info("Dataset loaded: %d rows", len(df))
     else:
-        # fallback to Kaggle
-        logger.info("Local CSV not found; attempting to download Kaggle dataset…")
-        import kagglehub
-        from kagglehub import KaggleDatasetAdapter
+        logger.error("CSV file not found at %s", local_csv)
+        raise FileNotFoundError(f"CSV not found: {local_csv}")
 
-        if not os.environ.get("KAGGLE_USERNAME") or not os.environ.get("KAGGLE_KEY"):
-            raise RuntimeError("Kaggle credentials missing and local CSV not available")
-
-        df = kagglehub.load_dataset(
-            KaggleDatasetAdapter.PANDAS,
-            "jainamgada45/indian-government-schemes",
-            "",  # empty string → load the default/first file in the dataset
-        )
-        df = df.drop(columns=[c for c in df.columns if "Unnamed" in c], errors="ignore")
-        logger.info("Dataset downloaded from Kaggle: %d rows, columns: %s", len(df), list(df.columns))
-
+    # Create documents (from rag.py approach)
     documents = []
     for _, row in df.iterrows():
-        content = (
-            f"Scheme Name: {row['scheme_name']}\n"
-            f"Category: {row['schemeCategory']}\n"
-            f"Level: {row['level']}\n"
-            f"Tags: {row['tags']}\n\n"
-            f"Details:\n{row['details']}\n\n"
-            f"Benefits:\n{row['benefits']}\n\n"
-            f"Eligibility:\n{row['eligibility']}\n\n"
-            f"Application Process:\n{row['application']}\n\n"
-            f"Required Documents:\n{row['documents']}"
-        )
+        content = f"""Scheme Name: {row['scheme_name']}
+Category: {row['schemeCategory']}
+Level: {row['level']}
+Tags: {row['tags']}
+
+Details:
+{row['details']}
+
+Benefits:
+{row['benefits']}
+
+Eligibility:
+{row['eligibility']}
+
+Application Process:
+{row['application']}
+
+Required Documents:
+{row['documents']}"""
+        
         documents.append(
             Document(
                 page_content=content.strip(),
@@ -248,16 +255,23 @@ def _build_and_save_vectorstore(save_path: str):
                 },
             )
         )
+    
+    logger.info("Created %d documents", len(documents))
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=120)
-    chunks = splitter.split_documents(documents)
+    # Split into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=120)
+    chunks = text_splitter.split_documents(documents)
+    logger.info("Split into %d chunks", len(chunks))
 
-    logger.info("Building FAISS index from %d chunks…", len(chunks))
+    # Build FAISS index using the proven rag.py approach
+    logger.info("Building FAISS index…")
     texts = [c.page_content for c in chunks]
     metadatas = [c.metadata for c in chunks]
     vectorstore = FAISS.from_texts(texts=texts, embedding=_embeddings, metadatas=metadatas)
+    
+    # Save index
     vectorstore.save_local(save_path)
-    logger.info("FAISS index saved to '%s'.", save_path)
+    logger.info("FAISS index saved to '%s'", save_path)
     return vectorstore
 
 
@@ -329,6 +343,13 @@ def retrieve_documents(
     # methods.
     try:
         logger.debug("_embeddings type: %s", type(_embeddings))
+        # Check if using DummyEmbeddings (which breaks RAG retrieval)
+        if type(_embeddings).__name__ == "DummyEmbeddings":
+            logger.warning(
+                "⚠️  USING FALLBACK DUMMYEMBEDDINGS - RAG WILL NOT WORK CORRECTLY!"
+                "\nThis happens when HuggingFace embeddings fail to load."
+                "\nFix: pip install sentence-transformers torch"
+            )
         if _vectorstore is not None:
             logger.debug("vectorstore.embedding_function type: %s", type(_vectorstore.embedding_function))
     except Exception:

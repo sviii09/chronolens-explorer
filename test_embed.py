@@ -1,0 +1,1 @@
+"import sys; sys.path.insert(0, 'src'); from langchain_community.embeddings import HuggingFaceEmbeddings; e = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2'); test = e.embed_query('test query'); print('SUCCESS: Embeddings work'); print('Vector length:', len(test)); print('All zeros:', all(x == 0.0 for x in test))"  

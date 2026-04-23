@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ import { CategoryBadge } from '@/components/ui/category-badge';
 import { cn } from '@/lib/utils';
 import { allDocuments, policyCategories } from '@/data/mockData';
 import { PolicyDocument, PolicyCategory, DocumentType } from '@/types/policy';
+import { parseSchemeCSV, convertSchemesToPolicies } from '@/services/csvParser';
+import { schemeCSVData, schemeCount, schemeMetadata } from '@/data/allSchemeData';
 
 const documentTypeLabels: Record<DocumentType, string> = {
   regulation: 'Regulation',
@@ -37,9 +39,52 @@ export default function PolicyExplorer() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedDoc, setSelectedDoc] = useState<PolicyDocument | null>(null);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [documents, setDocuments] = useState<PolicyDocument[]>(allDocuments);
+  const [isLoadingCSV, setIsLoadingCSV] = useState(true);
+
+  // Load CSV data on component mount
+  useEffect(() => {
+    try {
+      const schemes = parseSchemeCSV(schemeCSVData);
+      const policies = convertSchemesToPolicies(schemes);
+
+      // Enhanced logging with statistics
+      console.log('╔════════════════════════════════════════════════════════════╗');
+      console.log('║                 GOVERNMENT SCHEMES LOADED                  ║');
+      console.log('╚════════════════════════════════════════════════════════════╝');
+      console.log(`✅ Successfully loaded ${schemes.length} government schemes`);
+      console.log(`📊 Platform metadata:`, schemeMetadata);
+      console.log(`📋 Categories: ${schemeMetadata.categories.join(', ')}`);
+      console.log(`🏛️  Government levels: ${schemeMetadata.levels.join(', ')}`);
+      
+      console.log(`\n📑 Schemes by Category:`);
+      const byCategory: Record<string, number> = {};
+      schemes.forEach(scheme => {
+        const cat = scheme.schemeCategory || 'Other';
+        byCategory[cat] = (byCategory[cat] || 0) + 1;
+      });
+      Object.entries(byCategory).sort((a, b) => (b[1] as number) - (a[1] as number)).forEach(([cat, count]) => {
+        console.log(`   • ${cat}: ${count} schemes`);
+      });
+      
+      console.log(`\n🗂️  Sample schemes (first 5):`);
+      schemes.slice(0, 5).forEach((scheme, idx) => {
+        console.log(`   ${idx + 1}. ${scheme.scheme_name} (${scheme.level})`);
+      });
+
+      // Combine with existing mock data
+      setDocuments([...allDocuments, ...policies]);
+    } catch (err) {
+      console.error('Error loading CSV data:', err);
+      // Keep using mock data if CSV fails to load
+      setDocuments(allDocuments);
+    } finally {
+      setIsLoadingCSV(false);
+    }
+  }, []);
 
   const filteredDocuments = useMemo(() => {
-    return allDocuments.filter((doc) => {
+    return documents.filter((doc) => {
       const matchesSearch = !searchQuery || 
         doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.source.toLowerCase().includes(searchQuery.toLowerCase());
@@ -47,7 +92,7 @@ export default function PolicyExplorer() {
       const matchesType = typeFilter === 'all' || doc.type === typeFilter;
       return matchesSearch && matchesCategory && matchesType;
     });
-  }, [searchQuery, categoryFilter, typeFilter]);
+  }, [searchQuery, categoryFilter, typeFilter, documents]);
 
   const paginatedDocuments = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -97,23 +142,44 @@ export default function PolicyExplorer() {
   };
 
   // Mock document content for detail view
-  const getMockContent = (doc: PolicyDocument) => ({
-    fullText: `${doc.title}\n\nPublished by ${doc.source} on ${formatDate(doc.publishedAt)}\n\n${doc.excerpt}\n\nSection 1: Introduction\n\nThis document outlines the key policy framework and implementation guidelines. The policy aims to address current challenges and provide a comprehensive approach to solving identified issues.\n\nSection 2: Background\n\nThe policy development process involved extensive stakeholder consultation and evidence-based analysis. Previous policies in this area have been reviewed and their outcomes assessed.\n\nSection 3: Key Provisions\n\nThe main provisions of this policy include:\n- Standardized implementation procedures\n- Clear accountability frameworks\n- Monitoring and evaluation mechanisms\n- Resource allocation guidelines\n\nSection 4: Implementation Timeline\n\nThe policy will be implemented in phases over the next 24 months, with regular progress reviews and adjustments as needed.\n\nSection 5: Conclusion\n\nThis policy represents a significant step forward in addressing the identified challenges. Success will depend on coordinated efforts across all stakeholders.`,
-    chunks: [
-      { id: 'chunk-1', sectionName: 'Introduction', content: 'This document outlines the key policy framework and implementation guidelines. The policy aims to address current challenges and provide a comprehensive approach to solving identified issues.', charCount: 213 },
-      { id: 'chunk-2', sectionName: 'Background', content: 'The policy development process involved extensive stakeholder consultation and evidence-based analysis. Previous policies in this area have been reviewed and their outcomes assessed.', charCount: 189 },
-      { id: 'chunk-3', sectionName: 'Key Provisions', content: 'The main provisions of this policy include: Standardized implementation procedures, Clear accountability frameworks, Monitoring and evaluation mechanisms, Resource allocation guidelines.', charCount: 201 },
-      { id: 'chunk-4', sectionName: 'Implementation', content: 'The policy will be implemented in phases over the next 24 months, with regular progress reviews and adjustments as needed.', charCount: 124 },
-    ],
-    metadata: {
-      documentId: doc.id,
-      originalUrl: 'https://policy.gov/documents/' + doc.id,
-      ingestedAt: new Date().toISOString(),
-      chunkCount: 4,
-      rawLength: 2847,
-      cleanedLength: 2156,
-    },
-  });
+  const getMockContent = (doc: PolicyDocument) => {
+    // If document has actual content (from CSV), use it
+    if (doc.content) {
+      return {
+        fullText: doc.content,
+        chunks: [
+          { id: 'chunk-1', sectionName: 'Overview', content: doc.excerpt || doc.content, charCount: doc.content.length },
+        ],
+        metadata: doc.metadata || {
+          documentId: doc.id,
+          originalUrl: 'https://policy.gov/documents/' + doc.id,
+          ingestedAt: new Date().toISOString(),
+          chunkCount: 1,
+          rawLength: doc.content.length,
+          cleanedLength: doc.content.length,
+        },
+      };
+    }
+
+    // Fallback to mock content for regular documents
+    return {
+      fullText: `${doc.title}\n\nPublished by ${doc.source} on ${formatDate(doc.publishedAt)}\n\n${doc.excerpt}\n\nSection 1: Introduction\n\nThis document outlines the key policy framework and implementation guidelines. The policy aims to address current challenges and provide a comprehensive approach to solving identified issues.\n\nSection 2: Background\n\nThe policy development process involved extensive stakeholder consultation and evidence-based analysis. Previous policies in this area have been reviewed and their outcomes assessed.\n\nSection 3: Key Provisions\n\nThe main provisions of this policy include:\n- Standardized implementation procedures\n- Clear accountability frameworks\n- Monitoring and evaluation mechanisms\n- Resource allocation guidelines\n\nSection 4: Implementation Timeline\n\nThe policy will be implemented in phases over the next 24 months, with regular progress reviews and adjustments as needed.\n\nSection 5: Conclusion\n\nThis policy represents a significant step forward in addressing the identified challenges. Success will depend on coordinated efforts across all stakeholders.`,
+      chunks: [
+        { id: 'chunk-1', sectionName: 'Introduction', content: 'This document outlines the key policy framework and implementation guidelines. The policy aims to address current challenges and provide a comprehensive approach to solving identified issues.', charCount: 213 },
+        { id: 'chunk-2', sectionName: 'Background', content: 'The policy development process involved extensive stakeholder consultation and evidence-based analysis. Previous policies in this area have been reviewed and their outcomes assessed.', charCount: 189 },
+        { id: 'chunk-3', sectionName: 'Key Provisions', content: 'The main provisions of this policy include: Standardized implementation procedures, Clear accountability frameworks, Monitoring and evaluation mechanisms, Resource allocation guidelines.', charCount: 201 },
+        { id: 'chunk-4', sectionName: 'Implementation', content: 'The policy will be implemented in phases over the next 24 months, with regular progress reviews and adjustments as needed.', charCount: 124 },
+      ],
+      metadata: {
+        documentId: doc.id,
+        originalUrl: 'https://policy.gov/documents/' + doc.id,
+        ingestedAt: new Date().toISOString(),
+        chunkCount: 4,
+        rawLength: 2847,
+        cleanedLength: 2156,
+      },
+    };
+  };
 
   return (
     <div>
@@ -121,7 +187,18 @@ export default function PolicyExplorer() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground-strong">Policy Explorer</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Showing {filteredDocuments.length} documents
+          {isLoadingCSV ? (
+            'Loading government schemes...'
+          ) : (
+            <>
+              Showing {filteredDocuments.length} documents
+              {documents.length > 0 && (
+                <span className="ml-2 text-xs text-accent font-medium">
+                  ({allDocuments.length} policies + {documents.length - allDocuments.length} government schemes from {schemeCount} total)
+                </span>
+              )}
+            </>
+          )}
         </p>
       </div>
 
